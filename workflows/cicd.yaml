@@ -1,0 +1,131 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  IMAGE_NAME: dynamic-pricing-engine
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/app
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  train:
+    name: Train Model
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/app
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run training pipeline
+        env:
+          MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+        run: python pipeline/train_pipeline.py
+
+      - name: Upload trained model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: trained-model
+          path: pipeline/models/latest_model.json
+          retention-days: 7
+
+  build:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: train
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download trained model artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: trained-model
+          path: pipeline/models/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY_URL }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ secrets.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ secrets.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
+
+      - name: Update deployment image tag
+        run: |
+          kubectl set image deployment/pricing-api \
+            pricing-api=${{ secrets.REGISTRY_URL }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/configmap.yaml
+          kubectl apply -f k8s/secret.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+
+      - name: Wait for rollout
+        run: kubectl rollout status deployment/pricing-api --timeout=120s

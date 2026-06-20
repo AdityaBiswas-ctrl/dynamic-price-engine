@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pricing-api
+  labels:
+    app: pricing-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pricing-api
+  template:
+    metadata:
+      labels:
+        app: pricing-api
+    spec:
+      containers:
+        - name: pricing-api
+          image: dynamic-pricing-engine:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: pricing-api-config
+            - secretRef:
+                name: pricing-api-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3

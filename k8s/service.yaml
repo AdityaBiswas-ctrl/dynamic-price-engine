@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pricing-api-service
+  labels:
+    app: pricing-api
+spec:
+  type: ClusterIP
+  selector:
+    app: pricing-api
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000

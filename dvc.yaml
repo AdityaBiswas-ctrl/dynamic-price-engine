@@ -1,21 +1,10 @@
 stages:
-  # Example stage for data preparation
-  # prepare:
-  #   cmd: python src/prepare.py
-  #   deps:
-  #     - src/prepare.py
-  #     - data/raw
-  #   outs:
-  #     - data/prepared
-
-  # Example stage for model training
-  # train:
-  #   cmd: python pipeline/train.py
-  #   deps:
-  #     - pipeline/train.py
-  #     - data/prepared
-  #   outs:
-  #     - pipeline/model.pkl
-  #   metrics:
-  #     - pipeline/metrics.json:
-  #         cache: false
+  train:
+    cmd: python pipeline/train_pipeline.py
+    deps:
+    - config.py
+    - pipeline/train_pipeline.py
+    - src/feature_engineering.py
+    outs:
+    - data/processed/reference_data.csv
+    - pipeline/models/latest_model.json

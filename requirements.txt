@@ -18,6 +18,11 @@ lightgbm==4.3.0
 # Experiment tracking & versioning
 mlflow==2.11.3
 dvc==3.49.0
+# pathspec>=1.0 removed an internal API (_DIR_MARK) that dvc==3.49.0 imports,
+# causing `dvc init` to fail with: ImportError: cannot import name '_DIR_MARK'.
+# Pin pathspec explicitly below 1.0 until upgrading dvc to a version that
+# supports the newer pathspec API.
+pathspec==0.11.2
 
 # Drift detection
 evidently==0.4.16

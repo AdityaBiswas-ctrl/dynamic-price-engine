@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pricing-api-config
+data:
+  ENVIRONMENT: "production"
+  KAFKA_BROKER_URL: "kafka-service:9092"
+  DEFAULT_MODEL_TYPE: "xgboost"
+  MLFLOW_TRACKING_URI: "http://mlflow-service:5000"
+  DVC_REMOTE_NAME: "storage"
+  API_HOST: "0.0.0.0"
+  API_PORT: "8000"
+  DRIFT_CHECK_INTERVAL_MINUTES: "30"
+  DRIFT_THRESHOLD: "0.1"
+  PROMETHEUS_PORT: "9000"
+  GRAFANA_PORT: "3000"
+  LOG_LEVEL: "INFO"
