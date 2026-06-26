@@ -64,7 +64,7 @@
       "title": "Container CPU Usage (cAdvisor)",
       "type": "timeseries",
       "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
-      "description": "Sourced from cAdvisor via the kubelet, not from the app's own /metrics endpoint. Only populated when running in Kubernetes — see monitoring/prometheus.yml.",
+      "description": "Sourced from cAdvisor via the kubelet, not from the app's own /metrics endpoint. Only populated when running in Kubernetes — see monitoring/prometheus.yaml.",
       "targets": [
         {
           "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"pricing-api.*\"}[5m])) by (pod)",

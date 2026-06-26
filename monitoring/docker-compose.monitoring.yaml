@@ -1,14 +1,14 @@
-# docker-compose.monitoring.yml
+# docker-compose.monitoring.yaml
 # Spins up Prometheus + Grafana locally for development/testing.
 # Run from the project root:
-#   docker compose -f monitoring/docker-compose.monitoring.yml up
+#   docker compose -f monitoring/docker-compose.monitoring.yaml up
 #
 # Then:
 #   - Prometheus UI:  http://localhost:9090
 #   - Grafana UI:      http://localhost:3000  (default login: admin / admin)
 #
 # Make sure the pricing API is running on the host at port 8000 first
-# (see prometheus.yml's "pricing-api-local" job).
+# (see prometheus.yaml's "pricing-api-local" job).
 
 services:
   prometheus:
@@ -17,9 +17,9 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
     command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--config.file=/etc/prometheus/prometheus.yaml"
     extra_hosts:
       # Lets the container reach the API running on the host machine
       - "host.docker.internal:host-gateway"
@@ -34,7 +34,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+      - ./Grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./Grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus

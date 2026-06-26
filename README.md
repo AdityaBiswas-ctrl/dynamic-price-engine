@@ -40,7 +40,7 @@ dynamic-pricing-engine/
 ├── Dockerfile
 ├── pytest.ini
 ├── dvc.yaml / dvc.lock        # DVC pipeline stage + reproducibility lock
-├── .github/workflows/ci-cd.yaml
+├── .github/workflows/cicd.yaml
 ├── src/
 │   ├── data_generator.py      # simulates orders, weather, traffic, competitor prices
 │   ├── kafka_producer.py      # publishes simulated events to Kafka topics
@@ -55,9 +55,9 @@ dynamic-pricing-engine/
 ├── k8s/                       # Deployment, Service, ConfigMap, Secret
 ├── monitoring/
 │   ├── drift_detector.py      # Evidently-based drift detection
-│   ├── prometheus.yml
-│   ├── docker-compose.monitoring.yml
-│   └── grafana/                # provisioned datasource + dashboard
+│   ├── prometheus.yaml
+│   ├── docker-compose.monitoring.yaml
+│   └── Grafana/                # provisioned datasource + dashboard
 ├── data/processed/             # reference dataset for drift comparison (generated)
 └── tests/                      # 60 tests covering every module above
 ```
@@ -65,21 +65,34 @@ dynamic-pricing-engine/
 ## Quickstart
 
 ```bash
-# 1. Install dependencies
+# 1. Create and activate a virtual environment
+python -m venv venv
+
+# On Windows (PowerShell):
+.\venv\Scripts\Activate.ps1
+# On Windows (Command Prompt):
+.\venv\Scripts\activate.bat
+# On Linux/macOS:
+source venv/bin/activate
+
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 2. Copy and fill in environment variables
-cp .env.example .env   # or use the .env already provided as a starting point
+# 3. Setup environment variables (use the provided .env or copy from example if it exists)
+# On Linux/macOS/Windows PowerShell:
+cp .env.example .env
+# On Windows Command Prompt:
+copy .env.example .env
 
-# 3. Train the model (generates synthetic data, trains XGBoost, saves
+# 4. Train the model (generates synthetic data, trains XGBoost, saves
 #    pipeline/models/latest_model.json and data/processed/reference_data.csv)
 python pipeline/train_pipeline.py
 
-# 4. Run the API
+# 5. Run the API
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 # or: python app/main.py
 
-# 5. Try it
+# 6. Test the API
 curl http://localhost:8000/health
 curl -X POST http://localhost:8000/predict \
   -H "Content-Type: application/json" \
@@ -92,13 +105,20 @@ curl -X POST http://localhost:8000/predict \
   }'
 ```
 
-**Note:** if you run scripts directly (not via `pytest`, which handles this
-automatically), make sure the project root and `src/` are on your Python
-path, since `config.py` lives at the root and most modules import from it:
+**Note:** If you run scripts directly (not via `pytest`, which handles this automatically), make sure the project root and `src/` are on your Python path, since `config.py` lives at the root and most modules import from it:
 
-```bash
-export PYTHONPATH="$(pwd):$(pwd)/src:$(pwd)/app"
-```
+* **On Windows (PowerShell):**
+  ```powershell
+  $env:PYTHONPATH = "$PWD;$PWD/src;$PWD/app"
+  ```
+* **On Windows (Command Prompt):**
+  ```cmd
+  set PYTHONPATH=.;src;app
+  ```
+* **On Linux/macOS:**
+  ```bash
+  export PYTHONPATH="$(pwd):$(pwd)/src:$(pwd)/app"
+  ```
 
 ## Running tests
 
@@ -122,14 +142,14 @@ python src/kafka_consumer.py   # consumes, buffers, and assembles complete recor
 ## Monitoring (Prometheus + Grafana)
 
 ```bash
-docker compose -f monitoring/docker-compose.monitoring.yml up
+docker compose -f monitoring/docker-compose.monitoring.yaml up
 ```
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3000 (admin/admin) — dashboard auto-provisioned
 
 The API exposes `/metrics` with request latency, request counts, prediction
 volume by city, and prediction error counts. CPU/memory come from cAdvisor
-via Kubernetes, not from the app itself — see `monitoring/prometheus.yml`.
+via Kubernetes, not from the app itself — see `monitoring/prometheus.yaml`.
 
 ## Drift detection & auto-retraining
 
@@ -170,7 +190,7 @@ dvc pull     # download tracked data/model (e.g. on a fresh clone)
 
 ## CI/CD
 
-`.github/workflows/ci-cd.yaml` runs on push/PR to `main`: tests → train →
+`.github/workflows/cicd.yaml` runs on push/PR to `main`: tests → train →
 build Docker image → deploy to Kubernetes. Build and deploy steps need
 registry and kubeconfig secrets configured in your GitHub repo settings
 before they'll do anything beyond test and train.

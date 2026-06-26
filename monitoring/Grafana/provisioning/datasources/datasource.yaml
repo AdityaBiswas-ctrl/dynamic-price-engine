@@ -1,6 +1,6 @@
-# datasource.yml
+# datasource.yaml
 # Auto-provisions Prometheus as a Grafana datasource on startup.
-# Place at: monitoring/grafana/provisioning/datasources/datasource.yml
+# Place at: monitoring/Grafana/provisioning/datasources/datasource.yaml
 
 apiVersion: 1
 

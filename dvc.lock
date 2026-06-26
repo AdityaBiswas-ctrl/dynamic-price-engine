@@ -1,0 +1,26 @@
+schema: '2.0'
+stages:
+  train:
+    cmd: python pipeline/train_pipeline.py
+    deps:
+    - path: config.py
+      hash: md5
+      md5: 76d4bef3fef42b5c25b252d62193b51f
+      size: 4348
+    - path: pipeline/train_pipeline.py
+      hash: md5
+      md5: 1ae499e19a41de3cf9189adbffe891e8
+      size: 7902
+    - path: src/feature_engineering.py
+      hash: md5
+      md5: 8fafd4a594bd9188b6427846a31a6114
+      size: 4791
+    outs:
+    - path: data/processed/reference_data.csv
+      hash: md5
+      md5: c8b39c90db1c4d96af9c792c8bc2e844
+      size: 164603
+    - path: pipeline/models/latest_model.json
+      hash: md5
+      md5: a46750c76250e32557bdf660bbffe8fb
+      size: 872476

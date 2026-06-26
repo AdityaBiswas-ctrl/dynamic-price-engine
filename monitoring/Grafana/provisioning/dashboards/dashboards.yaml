@@ -1,7 +1,7 @@
-# dashboards.yml
+# dashboards.yaml
 # Tells Grafana to auto-load any dashboard JSON files placed in
-# monitoring/grafana/dashboards/ on startup.
-# Place at: monitoring/grafana/provisioning/dashboards/dashboards.yml
+# monitoring/Grafana/dashboards/ on startup.
+# Place at: monitoring/Grafana/provisioning/dashboards/dashboards.yaml
 
 apiVersion: 1
 
