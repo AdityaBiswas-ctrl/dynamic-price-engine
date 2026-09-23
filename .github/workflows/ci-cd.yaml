@@ -8,13 +8,13 @@ on:
 
 env:
   IMAGE_NAME: dynamic-pricing-engine
+  MLFLOW_TRACKING_URI: sqlite:///mlflow.db
+  PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/app
 
 jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/app
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -36,8 +36,6 @@ jobs:
     name: Train Model
     runs-on: ubuntu-latest
     needs: test
-    env:
-      PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/src:${{ github.workspace }}/app
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -53,8 +51,6 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run training pipeline
-        env:
-          MLFLOW_TRACKING_URI: sqlite:///mlflow.db
         run: python pipeline/train_pipeline.py
 
       - name: Upload trained model artifact

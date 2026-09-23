@@ -23,6 +23,13 @@ import mlflow.xgboost
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
+import os
+import sys
+
+# Ensure root and src directories are on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
 from config import (
     MLFLOW_TRACKING_URI,
     MLFLOW_EXPERIMENT_NAME,

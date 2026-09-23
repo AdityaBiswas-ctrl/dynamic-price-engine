@@ -100,6 +100,7 @@ DRIFT_CHECK_INTERVAL_MINUTES = int(os.getenv("DRIFT_CHECK_INTERVAL_MINUTES", 30)
 #     false-positive rate first -- see monitoring/drift_detector.py.
 DRIFT_THRESHOLD = float(os.getenv("DRIFT_THRESHOLD", 0.5))
 REFERENCE_DATA_PATH = os.path.join(BASE_DIR, "data", "processed", "reference_data.csv")
+PREDICTIONS_DB_PATH = os.path.join(BASE_DIR, "predictions.db")
 
 # ---------------------------
 # Retraining

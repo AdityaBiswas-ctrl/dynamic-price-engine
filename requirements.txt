@@ -27,9 +27,6 @@ pathspec==0.11.2
 # Drift detection
 evidently==0.4.16
 
-# Monitoring
-prometheus-client==0.20.0
-
 # Utilities
 python-dotenv==1.0.1
 requests==2.31.0

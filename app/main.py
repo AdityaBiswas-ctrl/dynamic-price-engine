@@ -16,41 +16,20 @@ from contextlib import asynccontextmanager
 import xgboost as xgb
 from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel, Field
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 
-from config import API_TITLE, API_VERSION, MODEL_DIR, FEATURE_COLUMNS
+import sys
+import sqlite3
+
+# Ensure project root and src directory are on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
+from config import API_TITLE, API_VERSION, MODEL_DIR, FEATURE_COLUMNS, PREDICTIONS_DB_PATH
 # pyrefly: ignore [missing-import]
 from feature_engineering import engineer_features
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("api")
-
-# ---------------------------
-# Prometheus metrics
-# (CPU/memory are NOT tracked here — those are host/container-level metrics
-# best collected by Prometheus's own node-exporter or cAdvisor sidecar,
-# not from inside the app process. See monitoring/README for details.)
-# ---------------------------
-REQUEST_LATENCY = Histogram(
-    "pricing_api_request_latency_seconds",
-    "Request latency in seconds",
-    ["endpoint", "method"],
-)
-REQUEST_COUNT = Counter(
-    "pricing_api_requests_total",
-    "Total number of requests received",
-    ["endpoint", "method", "status_code"],
-)
-PREDICTION_COUNT = Counter(
-    "pricing_api_predictions_total",
-    "Total number of successful price predictions made",
-    ["city"],
-)
-PREDICTION_ERROR_COUNT = Counter(
-    "pricing_api_prediction_errors_total",
-    "Total number of failed prediction requests",
-    ["error_type"],
-)
 
 MODEL_PATH = os.path.join(MODEL_DIR, "latest_model.json")
 _model = None  # loaded on startup via the lifespan handler below
@@ -68,9 +47,34 @@ def load_model():
     return model
 
 
+def init_db():
+    """Initializes predictions.db schema."""
+    conn = sqlite3.connect(PREDICTIONS_DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS predictions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            city TEXT,
+            predicted_price REAL,
+            demand_supply_ratio REAL,
+            peak_hour INTEGER,
+            weather_factor REAL,
+            traffic_factor REAL,
+            base_price REAL,
+            competitor_gap REAL,
+            time_of_day INTEGER
+        )
+    """)
+    conn.commit()
+    conn.close()
+    logger.info("Predictions database initialized at %s", PREDICTIONS_DB_PATH)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _model
+    init_db()
     try:
         _model = load_model()
     except FileNotFoundError as e:
@@ -82,20 +86,6 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=API_TITLE, version=API_VERSION, lifespan=lifespan)
-
-
-@app.middleware("http")
-async def track_metrics(request: Request, call_next):
-    start_time = time.time()
-    response = await call_next(request)
-    duration = time.time() - start_time
-
-    endpoint = request.url.path
-    REQUEST_LATENCY.labels(endpoint=endpoint, method=request.method).observe(duration)
-    REQUEST_COUNT.labels(
-        endpoint=endpoint, method=request.method, status_code=response.status_code
-    ).inc()
-    return response
 
 
 # ---------------------------
@@ -145,15 +135,9 @@ def health_check():
     return {"status": "ok", "model_loaded": _model is not None}
 
 
-@app.get("/metrics")
-def metrics():
-    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
-
-
 @app.post("/predict", response_model=PredictResponse)
 def predict(request: PredictRequest):
     if _model is None:
-        PREDICTION_ERROR_COUNT.labels(error_type="model_not_loaded").inc()
         raise HTTPException(
             status_code=503,
             detail="Model is not loaded. Train the model first via the training pipeline.",
@@ -170,21 +154,44 @@ def predict(request: PredictRequest):
         features = engineer_features(record)
     except Exception as e:
         logger.error("Feature engineering failed: %s", e)
-        PREDICTION_ERROR_COUNT.labels(error_type="feature_engineering_failed").inc()
         raise HTTPException(status_code=400, detail=f"Failed to engineer features: {e}")
 
     # Build the feature vector in the exact column order the model was trained on
     try:
         feature_vector = [[features[col] for col in FEATURE_COLUMNS]]
     except KeyError as e:
-        PREDICTION_ERROR_COUNT.labels(error_type="missing_feature_column").inc()
         raise HTTPException(
             status_code=500,
             detail=f"Missing expected feature column {e}. Check FEATURE_COLUMNS vs engineer_features().",
         )
 
     predicted_price = float(_model.predict(feature_vector)[0])
-    PREDICTION_COUNT.labels(city=features["city"]).inc()
+
+    try:
+        conn = sqlite3.connect(PREDICTIONS_DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO predictions (
+                timestamp, city, predicted_price, demand_supply_ratio,
+                peak_hour, weather_factor, traffic_factor, base_price,
+                competitor_gap, time_of_day
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            features["timestamp"],
+            features["city"],
+            round(predicted_price, 2),
+            features["demand_supply_ratio"],
+            features["peak_hour"],
+            features["weather_factor"],
+            features["traffic_factor"],
+            features["base_price"],
+            features["competitor_gap"],
+            features["time_of_day"]
+        ))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error("Failed to log prediction to database: %s", e)
 
     return PredictResponse(
         city=features["city"],

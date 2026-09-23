@@ -20,6 +20,13 @@ import numpy as np
 import xgboost as xgb
 from sklearn.metrics import mean_absolute_error
 
+import sys
+
+# Ensure root, src, and monitoring directories are on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "monitoring")))
+
 from config import (
     MODEL_DIR,
     RETRAIN_TRIGGER_ON_DRIFT,
@@ -86,8 +93,6 @@ def run_retraining_pipeline(force: bool = False, current_data=None) -> dict:
     """
     # Step 1: Check drift (unless forced)
     if not force:
-        if current_data is None:
-            current_data = generate_synthetic_dataset(n_samples=300)
         try:
             drift_summary = check_drift(current_data)
         except FileNotFoundError as e:

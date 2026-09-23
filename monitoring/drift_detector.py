@@ -13,13 +13,18 @@ recent predictions.
 import logging
 import os
 
+import sys
 import pandas as pd
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
+
 # pyrefly: ignore [missing-import]
 from evidently.report import Report
 # pyrefly: ignore [missing-import]
 from evidently.metric_preset import DataDriftPreset
 
-from config import FEATURE_COLUMNS, REFERENCE_DATA_PATH, DRIFT_THRESHOLD
+from config import FEATURE_COLUMNS, REFERENCE_DATA_PATH, DRIFT_THRESHOLD, PREDICTIONS_DB_PATH
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("drift_detector")
@@ -70,7 +75,23 @@ def run_drift_report(reference_df: pd.DataFrame, current_df: pd.DataFrame) -> di
     return summary
 
 
-def check_drift(current_df: pd.DataFrame) -> dict:
+def load_recent_predictions() -> pd.DataFrame:
+    """Loads prediction history from predictions.db."""
+    if not os.path.exists(PREDICTIONS_DB_PATH):
+        return pd.DataFrame()
+    import sqlite3
+    conn = sqlite3.connect(PREDICTIONS_DB_PATH)
+    try:
+        df = pd.read_sql_query("SELECT * FROM predictions", conn)
+    except Exception as e:
+        logger.error("Failed to read from predictions database: %s", e)
+        df = pd.DataFrame()
+    finally:
+        conn.close()
+    return df
+
+
+def check_drift(current_df: pd.DataFrame = None) -> dict:
     """
     Main entry point: loads the reference dataset and checks the given
     current data for drift against it. Returns a summary dict; callers
@@ -78,12 +99,22 @@ def check_drift(current_df: pd.DataFrame) -> dict:
     """
     reference_df = load_reference_data()
 
-    if len(current_df) < 30:
+    if current_df is None:
+        current_df = load_recent_predictions()
+
+    if len(current_df) < 100:
         logger.warning(
             "Only %d current samples provided; drift statistics are unreliable "
-            "below ~30 samples. Consider buffering more data before checking.",
+            "below 100 samples. Skipping drift detection.",
             len(current_df),
         )
+        return {
+            "dataset_drift": False,
+            "number_of_columns": len(FEATURE_COLUMNS),
+            "number_of_drifted_columns": 0,
+            "share_of_drifted_columns": 0.0,
+            "drift_share_threshold": DRIFT_THRESHOLD,
+        }
 
     summary = run_drift_report(reference_df, current_df)
 
